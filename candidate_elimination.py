@@ -71,12 +71,6 @@ def candidate_elimination(examples):
             else:
                 general = [h for h in general if not is_consistent(h, prev_instance, prev_label)]
 
-        # Ensure S and G are not empty
-        if not specific:
-            specific = [["0"] * len(examples[0][0])]
-        if not general:
-            general = [["?"] * len(examples[0][0])]
-
         print(f"Instance {example_no}: {instance}, Label: {label}")
         print(f"S = {specific}")
         print(f"G = {general}")
