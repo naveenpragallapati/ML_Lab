@@ -66,7 +66,6 @@ def candidate_elimination(examples):
 
         # Check consistency of S and G with all previous examples
         for prev_instance, prev_label in examples[:example_no]:
-            # specific = [h for h in specific if is_consistent(h, prev_instance, prev_label)]
             if prev_label == "Yes":
                 general = [h for h in general if is_consistent(h, prev_instance, prev_label)]
             else:
