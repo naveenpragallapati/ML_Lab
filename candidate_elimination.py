@@ -1,5 +1,3 @@
-import pandas as pd
-
 # Define possible values for each attribute
 attribute_values = {
     'Sky': ['Sunny', 'Cloudy', 'Rainy'],
@@ -19,131 +17,134 @@ attributes_map = {
     5: 'Forecast'
 }
 
+def candidate_elimination(examples):
+    """
+    Implements the candidate elimination algorithm.
 
-def more_general(h1, h2):
-    """ Check if hypothesis h1 is more general than h2 """
-    more_general_parts = []
-    for x, y in zip(h1, h2):
-        mg = x == '?' or (x != '0' and (x == y or y == '0'))
-        more_general_parts.append(mg)
-    return all(more_general_parts)
+    Args:
+        examples: A list of tuples (instance, label), where instance is a list of attribute values and label is the corresponding class.
 
+    Returns:
+        A list of hypotheses that are consistent with all positive examples and inconsistent with all negative examples.
+    """
 
-def covers(example, hypothesis):
-    """Check if hypothesis covers the example"""
-    return more_general(hypothesis, example)
+    # Initialize the general and specific hypotheses
+    general = [["?"] * len(examples[0][0])]
+    specific = [["0"] * len(examples[0][0])]
 
+    # Iterate over each example
+    example_no = 0
+    print(f"Initialization")
+    print(f"S = {specific}")
+    print(f"G = {general}")
+    print()
+    for instance, label in examples:
+        example_no += 1
+        if label == "Yes":
+            # If the instance is positive, remove any general hypothesis that is inconsistent with it
+            general = [h for h in general if is_consistent(h, instance, label)]
 
-def consistent(h1, x1, y_label):
-    """ Check if hypothesis h1 is consistent with example x1 """
-    y_label = True if y_label == 'Yes' else False
-    return True if (covers(x1, h1) == y_label) else False
+            # If the specific hypothesis is inconsistent with the instance, make it more general
+            if not is_consistent(specific[0], instance, label):
+                for i in range(len(specific[0])):
+                    if specific[0][i] == "0":
+                        specific[0][i] = instance[i]
+                    elif specific[0][i] != instance[i]:
+                        specific[0][i] = "?"
+        else:
+            # If the instance is negative, remove any specific hypothesis that is consistent with it
+            specific = [h for h in specific if not is_consistent(h, instance, label)]
 
+            # If the general hypothesis is consistent with the instance, make it more specific
+            if general:
+                bool_value = is_consistent(general[0], instance, label)
+                if bool_value:
+                    new_general = []
+                    for g in general:
+                        new_general += specialize_g(g, instance, attributes_map, attribute_values)
+                    general = new_general
 
-def min_generalizations(s, d, y_label, gb):
-    """Generate all minimal generalizations of h of s such that h is consistent with d"""
-    min_genls = []
-    for i in range(len(s)):
-        if s[i] != d[i]:
-            h = s
-            if s[i] != '?':
-                h[i] = '?'
-            if consistent(h, d, y_label):
-                # Check if some member of G is more general than h
-                if any(more_general(g, h) for g in gb):
-                    min_genls.append(h)
-    return min_genls
+        # Check consistency of S and G with all previous examples
+        for prev_instance, prev_label in examples[:example_no]:
+            # specific = [h for h in specific if is_consistent(h, prev_instance, prev_label)]
+            if prev_label == "Yes":
+                general = [h for h in general if is_consistent(h, prev_instance, prev_label)]
+            else:
+                general = [h for h in general if not is_consistent(h, prev_instance, prev_label)]
 
+        # Ensure S and G are not empty
+        if not specific:
+            specific = [["0"] * len(examples[0][0])]
+        if not general:
+            general = [["?"] * len(examples[0][0])]
 
-def min_specializations(g, d, y_label, sb):
-    """Generate all minimal specializations of h of g such that h is consistent with d"""
-    min_spls = []
-    for i in range(len(g)):
-        if g[i] == d[i]:
-            h = list(g)
-            if consistent(h, d, y_label):
-                if any(more_general(h, s) for s in sb):
-                    min_spls.append(h)
-        elif g[i] == '?':
-            for val in attribute_values[attributes_map[i]]:
-                if g[i] != val:
-                    h = list(g)
-                    h[i] = val
-                    if consistent(h, d, y_label):
-                        # Check if h is more general than some hypothesis in S
-                        if any(more_general(h, s) for s in sb):
-                            min_spls.append(tuple(h))
-    return min_spls
+        print(f"Instance {example_no}: {instance}, Label: {label}")
+        print(f"S = {specific}")
+        print(f"G = {general}")
+        print()
 
+    return general, specific
 
-def candidate_elimination_algorithm(data):
-    # Get training examples
-    instances = [set(data[col]) for col in data.columns[:-1]]
-    # Initialize specific boundary and general boundary
-    sb = [list('0' for _ in range(len(instances)))]
-    gb = [list('?' for _ in range(len(instances)))]
-    print("Step: 0", )
-    print_sg_gb(sb, gb)
+def is_consistent(hypothesis, instance, label):
+    """
+    Checks if a hypothesis is consistent with an instance and label.
 
-    for index, row in data.iterrows():
-        d, y = row.iloc[:-1].tolist(), row.iloc[-1]
-        if y == 'Yes':  # Positive instance
-            # Remove from G any hypothesis inconsistent with d.
-            gb = [g for g in gb if consistent(g, d, y)]
-            sb_new = []
-            for s in sb:
-                if not consistent(s, d, y):
-                    all_zeros = all(element == '0' for element in s)
-                    if all_zeros:
-                        sb_new.append(d)
-                    else:
-                        # Remove s from S
-                        sb_new = [sh for sh in sb if sh != s]
-                        # Add to S all minimal generalizations h of s such that h consistent with d
-                        sb_new.extend(min_generalizations(s, d, y, gb))
-                else:
-                    sb_new.append(s)
-            sb = sb_new
-            # Remove from S any hypothesis that is more general than another hypothesis
-            sb = [s for s in sb if not any(more_general(s, s1) for s1 in sb if s != s1)]
-        else:  # Negative instance
-            # Remove from S any hypothesis inconsistent with d.
-            sb = [s for s in sb if consistent(s, d, y)]
-            gb_new = []
-            for g in gb:
-                if not consistent(g, d, y):
-                    # Remove g from G
-                    gb_new = [gh for gh in gb if gh != g]
-                    # Add to G all minimal specializations h of g such that h consistent with d
-                    gb_new.extend(min_specializations(g, d, y, sb))
-                else:
-                    gb_new.append(g)
-            gb = gb_new
-            # Remove from G any hypothesis that is less general than another hypothesis
-            gb = [g for g in gb if not any(more_general(g1, g) for g1 in gb if g != g1)]
-        print("Step:", index+1)
-        print_sg_gb(sb, gb)
-    return sb, gb
+    Args:
+        hypothesis: A list of attribute values representing a hypothesis.
+        instance: A list of attribute values representing an instance.
+        label: The class label of the instance.
 
+    Returns:
+        True if the hypothesis is consistent with the instance and label, False otherwise.
+    """
 
-def print_sg_gb(s, g):
-    print("S:", s)
-    print("G:", g)
+    # Check if the hypothesis is more general than the instance
+    for i in range(len(hypothesis)):
+        if hypothesis[i] != "?" and hypothesis[i] != instance[i]:
+            return False
 
+    # Check if the hypothesis implies the label
+    if label == "Yes":
+        return True
+    else:
+        return hypothesis != instance
+
+def specialize_g(hypothesis, instance, attrib_map, attrib_values):
+    """
+    Specializes a general hypothesis to exclude a negative instance.
+
+    Args:
+        hypothesis: A list of attribute values representing a hypothesis.
+        instance: A list of attribute values representing an instance.
+        attrib_map: A dictionary mapping attribute indices to attribute names.
+        attrib_values: A dictionary mapping attribute names to possible values.
+
+    Returns:
+        A list of specialized hypotheses.
+    """
+    specializations = []
+    for i in range(len(hypothesis)):
+        if hypothesis[i] == "?":
+            for value in attrib_values[attrib_map[i]]:
+                if value != instance[i]:
+                    new_hypothesis = hypothesis[:]
+                    new_hypothesis[i] = value
+                    specializations.append(new_hypothesis)
+    return specializations
 
 if __name__ == "__main__":
-    # Training Examples with labels
-    training_examples = pd.DataFrame([
-        ['Sunny', 'Warm', 'Normal', 'Strong', 'Warm', 'Same', 'Yes'],
-        ['Sunny', 'Warm', 'High', 'Strong', 'Warm', 'Same', 'Yes'],
-        ['Rainy', 'Cold', 'High', 'Strong', 'Warm', 'Change', 'No'],
-        ['Sunny', 'Warm', 'High', 'Strong', 'Cool', 'Change', 'Yes']
-    ], columns=['Sky', 'AirTemp', 'Humidity', 'Wind', 'Water', 'Forecast', 'EnjoySport'])
-    target_concept = 'EnjoySport'
+    # Define the training examples
+    training_examples = [
+        (['Sunny', 'Warm', 'Normal', 'Strong', 'Warm', 'Same'], 'Yes'),
+        (['Sunny', 'Warm', 'High', 'Strong', 'Warm', 'Same'], 'Yes'),
+        (['Rainy', 'Cold', 'High', 'Strong', 'Warm', 'Change'], 'No'),
+        (['Sunny', 'Warm', 'High', 'Strong', 'Cool', 'Change'], 'Yes')
+    ]
 
-    # Run Candidate Elimination Algorithm
-    specific_boundary, general_boundary = candidate_elimination_algorithm(training_examples)
+    # Run the candidate elimination algorithm
+    general_boundary, specific_boundary = candidate_elimination(training_examples)
 
-    # Print Version Space
-    print("Version Space:")
-    print_sg_gb(specific_boundary, general_boundary)
+    # Print the final version space
+    print("Final Version Space:")
+    print(f"S = {specific_boundary}")
+    print(f"G = {general_boundary}")
