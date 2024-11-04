@@ -41,3 +41,8 @@ print(f'Mean Squared Error: {mse}')
 #Evaluate on Test Data
 mse = mean_squared_error(y_test, y_pred)
 print(f'Mean Squared Error: {mse}')
+
+# Predict the value at a given point (e.g., 5 years of experience)
+years_of_experience = [[5]]
+predicted_salary = regressor.predict(years_of_experience)
+print(f'Predicted Salary for {years_of_experience[0][0]} years of experience: {predicted_salary[0]}')
