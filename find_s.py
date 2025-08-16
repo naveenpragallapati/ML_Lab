@@ -1,6 +1,5 @@
 import pandas as pd
 
-
 def find_s_algorithm(data, target):
     # Initialize the most specific hypothesis
     h = None

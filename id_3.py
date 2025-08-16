@@ -51,8 +51,10 @@ def info_gain(data, split_attribute_name, target_name="class"):
     """Calculate the entropy of the total dataset"""
     total_entropy = entropy(data[target_name])
     vals, counts = np.unique(data[split_attribute_name], return_counts=True)
+
     '''Calculate the weighted entropy'''
     weighted_entropy = np.sum([(counts[i]/np.sum(counts)) * entropy(data.where(data[split_attribute_name] == vals[i]).dropna()[target_name]) for i in range(len(vals))])
+
     '''Calculate the information gain'''
     information_gain = total_entropy - weighted_entropy
     return information_gain
@@ -60,21 +62,28 @@ def info_gain(data, split_attribute_name, target_name="class"):
 def id3(data, original_data, features, target_attribute_name="class", parent_node_class=None):
     """Define the stopping criteria --> If one of this is satisfied, we want to return a leaf node"""
     if len(np.unique(data[target_attribute_name])) <= 1:
+        '''If all target values are the same, return this value as leaf node'''
         return np.unique(data[target_attribute_name])[0]
     elif len(data) == 0:
+        '''If the dataset is empty, return the mode of the target attribute in the original dataset'''
         return np.unique(original_data[target_attribute_name])[np.argmax(np.unique(original_data[target_attribute_name], return_counts=True)[1])]
     elif len(features) == 0:
+        '''If there are no more features to split on, return the mode of the target attribute in the dataset'''
         return parent_node_class
     else:
-        '''Define the parent node '''
+        '''If none of the stopping criteria are satisfied, we want to continue building the tree'''
+        '''Get the class label with the highest count in the target attribute'''
         parent_node_class = np.unique(data[target_attribute_name])[np.argmax(np.unique(data[target_attribute_name], return_counts=True)[1])]
+
         '''Select the feature which best splits the dataset'''
         item_values = [info_gain(data, feature, target_attribute_name) for feature in features]
         best_feature_index = np.argmax(item_values)
         best_feature = features[best_feature_index]
+
         '''Create the tree structure. The root gets the name of the feature (best_feature) with the maximum information gain in the first run'''
         tree = {best_feature: {}}
         features = [i for i in features if i != best_feature]
+
         '''Grow a branch under the root node for each possible value of the root node feature'''
         for value in np.unique(data[best_feature]):
             sub_data = data.where(data[best_feature] == value).dropna()
